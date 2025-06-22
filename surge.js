@@ -1,22 +1,22 @@
 function surge(actions = {}, templates = {}) {
-  const DATA_LIST = "[data-reaction],[data-bind],[data-template],[data-action]";
+  const DATA_LIST = "[data-value], [data-bind],[data-template]";
   const elements = new Map();
   const bindings = {};
   const state = {};
-  const boundEvents = new Set();
   const calcs = initializeCalcs();
   const localStorageKey =
     document.querySelector("[data-surge]")?.dataset.localStorage || null;
 
-  // Base function to access elements
+  // Base function to access elements, jQuery style
   const base = (selector) => {
     if (elements.has(selector)) return elements.get(selector);
-    const els = surgeContainer.querySelectorAll(selector);
-    if (els.length < 1) return;
-    els.forEach((el) => registerElement(el));
-    return elements
-      .set(selector, els.length === 1 ? els[0] : els)
-      .get(selector);
+
+    const el = surgeContainer.querySelector(selector);
+    if (el) {
+      registerElement(el);
+      elements.set(selector, el); // Cache the selector
+    }
+    return el;
   };
 
   // Proxy to intercept property access for state
@@ -26,14 +26,14 @@ function surge(actions = {}, templates = {}) {
       return target[prop]; // Allow access to $ methods like $.name
     },
     set(target, prop, value) {
-      if (bindings[prop] && state[prop] !== value) {
+      state[prop] = value;
+      if (bindings[prop]) {
         bindings[prop].forEach((el) => {
           const template = templates[prop] || templates[el.dataset.template];
           el.innerHTML = template ? template(value, $) : value;
           updateCalculations(prop);
         });
       }
-      state[prop] = value;
       if (localStorageKey) {
         localStorage.setItem(
           `${localStorageKey}-${prop}`,
@@ -54,26 +54,32 @@ function surge(actions = {}, templates = {}) {
   bindAllActions(surgeContainer);
 
   function initializeTemplate(el) {
-    const template =
-      templates[el.dataset.reaction] || templates[el.dataset.template];
+    const template = templates[el.dataset.template];
     if (template) el.innerHTML = template(undefined, $);
     el.querySelectorAll(DATA_LIST).forEach(processElement);
   }
 
   function processElement(el) {
     if (el.dataset.template) initializeTemplate(el);
-    if (el.dataset.reaction) initializeBinding(el);
+    if (el.dataset.value) initializeBinding(el);
     if (el.dataset.bind) bindTwoWay(el);
-    if (el.dataset.action) bindAllActions(surgeContainer, el);
   }
 
   function initializeBinding(el) {
-    const key = el.dataset.reaction;
-    const stored =
-      localStorageKey && localStorage.getItem(`${localStorageKey}-${key}`);
-    state[key] = parseInput(stored ?? el.textContent);
-    (bindings[key] ||= []).push(el);
-    initializeTemplate(el);
+    const key = el.dataset.value;
+
+    if (localStorageKey) {
+      const stored = localStorage.getItem(`${localStorageKey}-${key}`);
+      if (stored) state[key] = parseInput(stored);
+    } else {
+      state[key] = parseInput(el.textContent);
+    }
+
+    bindings[key] ||= [];
+    bindings[key].push(el);
+
+    const template = templates[key] || templates[el.dataset.template];
+    el.innerHTML = template ? template(state[key], $) : state[key];
   }
 
   function registerElement(el) {
@@ -109,37 +115,44 @@ function surge(actions = {}, templates = {}) {
     });
   }
 
-  function bindAllActions(container, el = null) {
-    const targets = el ? [el] : container.querySelectorAll("[data-action]");
-    targets.forEach((element) => {
-      const [event] = element.dataset.action.includes("->")
-        ? element.dataset.action.split("->").map((s) => s.trim())
-        : [getEvent(element)];
+  function bindAllActions(container) {
+    const actionEvents = new Set();
+    container.querySelectorAll("[data-action]").forEach((el) => {
+      const [event] = el.dataset.action.includes("->")
+        ? el.dataset.action.split("->").map((s) => s.trim())
+        : [getEvent(el)];
 
-      if (!boundEvents.has(event)) {
-        container.addEventListener(event, handleAction);
-        boundEvents.add(event);
-      }
+      actionEvents.add(event);
     });
-  }
-  function handleAction(e) {
-    const el = e.target.closest("[data-action]");
-    if (!el || !surgeContainer.contains(el)) return;
+    actionEvents.forEach((event) => {
+      container.addEventListener(event, (e) => {
+        const el = e.target.closest("[data-action]");
+        if (!el || !container.contains(el)) return;
 
-    const [expectedEvent, action] = el.dataset.action.includes("->")
-      ? el.dataset.action.split("->").map((s) => s.trim())
-      : [getEvent(el), el.dataset.action];
+        const [expectedEvent, action] = el.dataset.action.includes("->")
+          ? el.dataset.action.split("->").map((s) => s.trim())
+          : [getEvent(el), el.dataset.action];
 
-    if (expectedEvent !== e.type) return;
+        if (expectedEvent !== event) return;
 
-    if (el.dataset.default == null) e.preventDefault();
+        if (el.dataset.default == null) e.preventDefault();
 
-    const [method, args] = parseAction(action);
-    if (actions[method]) {
-      Array.isArray(args)
-        ? actions[method](...args)($, e)
-        : actions[method]($, e);
-    }
+        const [method, args] = parseAction(action);
+        if (actions[method]) {
+          Array.isArray(args)
+            ? actions[method](...args)($, e)
+            : actions[method]($, e);
+        } else {
+          try {
+            // If not a function, treat it as an expression
+            const fn = new Function("$", "$event", `with($) { ${action} }`);
+            fn($, e);
+          } catch (err) {
+            console.error(`Error evaluating inline action: "${action}"`, err);
+          }
+        }
+      });
+    });
   }
 
   function initializeCalcs() {
@@ -150,14 +163,16 @@ function surge(actions = {}, templates = {}) {
       )
       .forEach((el) => {
         const calcs = el.dataset.calculate.split(",");
-        const val = el.dataset.reaction;
+        const val = el.dataset.value;
         calcs.forEach((calc) => {
           const func = actions[calc];
           if (!func) return;
           const existingCalc = calculations.find((c) => c.func === func);
-          existingCalc
-            ? existingCalc.values.push(val)
-            : calculations.push({ func, values: [val] });
+          if (existingCalc) {
+            existingCalc.values.push(val);
+          } else {
+            calculations.push({ func, values: [val] });
+          }
         });
       });
     return calculations;
@@ -173,6 +188,7 @@ function surge(actions = {}, templates = {}) {
   }
 
   if (actions.init) actions.init($);
+  return $;
 }
 
 function getEvent(el) {
@@ -186,9 +202,11 @@ function getEvent(el) {
 function parseAction(action) {
   const match = action.match(/^(\w+)\((.*)\)$/);
   const method = match ? match[1].trim() : action;
-  const args =
-    match?.[2]?.split(",").map((arg) => parseInput(arg.trim())) ?? null;
-
+  const args = match
+    ? match[2]
+      ? match[2].split(",").map((arg) => parseInput(arg.trim()))
+      : [undefined]
+    : null;
   return [method, args];
 }
 
