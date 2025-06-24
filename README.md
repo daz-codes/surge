@@ -150,17 +150,9 @@ Have a look at the examples below to see how Surge can be used to create a varie
 ```html
 <main data-surge>
   <h1>❤️ <strong data-reaction="count">0</strong></h1>
-  <button data-action="increment">👍</button>
-  <button data-action="decrement">👎</button>
+  <button data-action="$.count.value++">👍</button>
+  <button data-action="$.count.value--">👎</button>
 </main>
-```
-
-#### JavaScript:
-```javascript
-surge({
-  increment: $ => $.count.value++,
-  decrement: $ => $.count.value--
-})
 ```
 
 [See the code on CodePen](https://codepen.io/daz4126/pen/oNOVEme)
@@ -172,19 +164,12 @@ surge({
 #### HTML:
 ```html
 <main data-surge>
-  <textarea data-action="count"></textarea>
+  <textarea data-action="$.count.value = event.target.value.length"></textarea>
   <p>
     There are
     <strong data-reaction="count">0</strong> characters in this textarea.
   </p>
 </main>
-```
-
-#### JavaScript:
-```javascript
-surge({
-  count: ($,e) => $.count.value = e.target.value.length
-})
 ```
 
 [See the code on CodePen](https://codepen.io/daz4126/pen/XWQONvR)
