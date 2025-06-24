@@ -4,28 +4,20 @@
 
 Surge is a tiny, ultra-lightweight JavaScript library that adds a surge of reactivity to your HTML — all in just 1kb (minified and gzipped).
 
-See how simple a basic counter is - just use data-attributes to add an action and a reaction!
+Look how simple a basic counter is - just add a data-action and data-reaction for instant reactivity!
 
 ```html
 <main data-surge>
-  <button data-action="increment">Count</button>
+  <button data-action="$.count++">Count</button>
   <h1 data-reaction="count">0</h1>
 </main>
 ```
 
-Then tell the action what to do in your JavaScript:
-
-```javacript
-surge({
-  increment: $ => $.count ++
-})
-```
-
-What if you could have an object that behaved like jQuery, but also managed reactive state? With Surge you can!
+The `$` is the Surge object, it's like a next-gen jQuery that can also manage reactive state!
 
 No virtual DOM. No build step. No dependencies. Just drop it in and go.
 
-Surge embraces the simplicity of the web and the power of HTML-first development. It supercharges your HTML with a sprinkle of declarative magic using `data-*` attributes — no JSX, no diffing and no dependencies. Just clean, semantic HTML — with a surge of reactiviey.
+Surge embraces the simplicity of the web and the power of HTML-first development. It supercharges your HTML with a sprinkle of declarative magic using `data-*` attributes — no JSX, no diffing and no dependencies. Just clean, semantic HTML — with a surge of reactivity!
 
 ## Another Example
 
@@ -39,7 +31,7 @@ Write some HTML ...
 </div>
 ```
 
-... then add a Surge of Reactivity in the JS:
+... then register the named action in the JS:
 
 ```javascript
 surge({
@@ -80,7 +72,7 @@ Add a `data-action` attribute to an element to tell it what action you want to r
 You actually don't need to specify the event in most cases because Surge will use the default event or elements, so this will also call the `increment` action when the button is clicked because 'click' is the default event for buttons:
 
 ```javascript
-<button data-action="count">Count</button>
+<button data-action="increment">Count</button>
 ```
 
 The default actions for elements are summarised below:
@@ -123,6 +115,19 @@ To get it working, an object of all the actions just needs passing to the Surge 
 const actions = { increment }
 surge(actions)
 ```
+
+For simple, one-line actions, you can just write them inline like this:
+
+```javascript
+<button data-action="$.count++">Count</button>
+```
+
+This means that you don't need to write any JavaScript at all, just call the surge function:
+
+```javascript
+surge()
+```
+
 
 ### ⚡️ 2-Way Bindings
 
