@@ -164,7 +164,7 @@ Have a look at the examples below to see how Surge can be used to create a varie
 #### HTML:
 ```html
 <main data-surge>
-  <textarea data-action="$.count.value = $value.length"></textarea>
+  <textarea data-action="$.count = $el.value.length"></textarea>
   <p>
     There are
     <strong data-reaction="count">0</strong> characters in this textarea.
