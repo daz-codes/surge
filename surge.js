@@ -144,9 +144,30 @@ function surge(actions = {}, templates = {}) {
             : actions[method]($, e);
         } else {
           try {
-            // If not a function, treat it as an expression
-            const fn = new Function("$", "$event", `with($) { ${action} }`);
-            fn($, e);
+            $.$el = el;
+            $.$event = e;
+            $.$target = e.target;
+            $.$value = e.target.value;
+            $.$checked = e.target.checked;
+            const magicProps = [
+              "$el",
+              "$event",
+              "$target",
+              "$value",
+              "$checked",
+            ];
+            const magicBindings = magicProps
+              .map((name) => `const ${name} = $["${name}"];`)
+              .join("\n");
+
+            const fn = new Function(
+              "$",
+              `
+          ${magicBindings}
+          with($) { ${action} }
+        `,
+            );
+            fn($);
           } catch (err) {
             console.error(`Error evaluating inline action: "${action}"`, err);
           }
