@@ -1,5 +1,5 @@
 function surge(actions = {}, templates = {}) {
-  const DATA_LIST = "[data-reaction], [data-bind],[data-template]";
+  const DATA_LIST = "[data-reaction],[data-bind],[data-template]";
   const elements = new Map();
   const bindings = {};
   const state = {};
@@ -55,7 +55,8 @@ function surge(actions = {}, templates = {}) {
 
   function initializeTemplate(el) {
     const template = templates[el.dataset.template];
-    if (template) el.innerHTML = template(undefined, $);
+    const target = document.querySelector(el.dataset.target) || el;
+    if (template) target.innerHTML = template(undefined, $);
     el.querySelectorAll(DATA_LIST).forEach(processElement);
   }
 
@@ -116,61 +117,100 @@ function surge(actions = {}, templates = {}) {
   }
 
   function bindAllActions(container) {
-    const actionEvents = new Set();
-    container.querySelectorAll("[data-action]").forEach((el) => {
-      const [event] = el.dataset.action.includes("->")
-        ? el.dataset.action.split("->").map((s) => s.trim())
-        : [getEvent(el)];
+    const ACTION_ATTRS = [
+      "data-action",
+      "data-get",
+      "data-post",
+      "data-patch",
+      "data-delete",
+    ];
 
-      actionEvents.add(event);
-    });
+    const actionEvents = new Set();
+
+    container
+      .querySelectorAll(ACTION_ATTRS.map((a) => `[${a}]`).join(","))
+      .forEach((el) => {
+        const { attr, value } = getActionAttribute(el);
+        const [event] = value.includes("->")
+          ? value.split("->").map((s) => s.trim())
+          : [getEvent(el)];
+        actionEvents.add(event);
+      });
+
     actionEvents.forEach((event) => {
       container.addEventListener(event, (e) => {
-        const el = e.target.closest("[data-action]");
+        const el = e.target.closest(
+          ACTION_ATTRS.map((a) => `[${a}]`).join(","),
+        );
         if (!el || !container.contains(el)) return;
 
-        const [expectedEvent, action] = el.dataset.action.includes("->")
-          ? el.dataset.action.split("->").map((s) => s.trim())
-          : [getEvent(el), el.dataset.action];
+        const { attr, value } = getActionAttribute(el);
+        const [expectedEvent, action] = value.includes("->")
+          ? value.split("->").map((s) => s.trim())
+          : [getEvent(el), value];
 
         if (expectedEvent !== event) return;
-
         if (el.dataset.default == null) e.preventDefault();
 
-        const [method, args] = parseAction(action);
-        if (actions[method]) {
-          Array.isArray(args)
-            ? actions[method](...args)($, e)
-            : actions[method]($, e);
-        } else {
-          try {
-            $.$el = el;
-            $.$event = e;
-            $.$target = e.target;
-            $.$value = e.target.value;
-            $.$checked = e.target.checked;
-            const magicProps = [
-              "$el",
-              "$event",
-              "$target",
-              "$value",
-              "$checked",
-            ];
-            const magicBindings = magicProps
-              .map((name) => `const ${name} = $["${name}"];`)
-              .join("\n");
-
-            const fn = new Function(
-              "$",
-              `
-          ${magicBindings}
-          with($) { ${action} }
-        `,
-            );
-            fn($);
-          } catch (err) {
-            console.error(`Error evaluating inline action: "${action}"`, err);
+        if (attr === "data-action") {
+          // JS function or inline code
+          const [method, args] = parseAction(action);
+          if (actions[method]) {
+            Array.isArray(args)
+              ? actions[method](...args)($, e)
+              : actions[method]($, e);
+          } else {
+            try {
+              const scope = getMagicScope($, e, el);
+              evaluateExpression(`with($) { ${action} }`, scope, true);
+            } catch (err) {
+              console.error(`Error evaluating inline action: "${action}"`, err);
+            }
           }
+        } else {
+          // HTTP-based action
+          const url = action;
+          const method = el.dataset.post
+            ? "POST"
+            : el.dataset.patch
+              ? "PATCH"
+              : el.dataset.delete
+                ? "DELETE"
+                : "GET";
+
+          const target = document.querySelector(el.dataset.target);
+          const template = templates[el.dataset.template];
+          const scope = { $event: e, $el: e.target };
+          let body = null;
+
+          if (el.dataset.params) {
+            try {
+              const evaluatedParams = evaluateExpression(
+                el.dataset.params,
+                scope,
+              );
+              body = JSON.stringify(evaluatedParams);
+            } catch (err) {
+              console.error("Error evaluating params:", err);
+            }
+          }
+
+          fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: method === "GET" ? null : body,
+          })
+            .then((res) =>
+              res.headers.get("content-type")?.includes("application/json")
+                ? res.json()
+                : res.text(),
+            )
+            .then((data) => {
+              if (target) {
+                target.innerHTML = template ? template(data, $) : data;
+                target.querySelectorAll(DATA_LIST).forEach(processElement);
+              }
+            });
         }
       });
     });
@@ -220,6 +260,14 @@ function getEvent(el) {
   );
 }
 
+function getActionAttribute(el) {
+  for (const attr of ["action", "get", "post", "patch", "delete"]) {
+    const key = `data-${attr}`;
+    if (el.hasAttribute(key)) return { attr: key, value: el.getAttribute(key) };
+  }
+  return null;
+}
+
 function parseAction(action) {
   const match = action.match(/^(\w+)\((.*)\)$/);
   const method = match ? match[1].trim() : action;
@@ -238,4 +286,28 @@ function parseInput(value) {
     return value;
   }
 }
+
+function evaluateExpression(expr, scope = {}, run = false) {
+  try {
+    const argNames = Object.keys(scope);
+    const argValues = Object.values(scope);
+    const code = run ? expr : `return (${expr})`;
+    return new Function(...argNames, code)(...argValues);
+  } catch (err) {
+    console.error(`Error evaluating expression: "${expr}"`, err);
+    return undefined;
+  }
+}
+
+function getMagicScope($, e, el) {
+  return {
+    $,
+    $el: el,
+    $event: e,
+    $target: e.target,
+    $value: e.target?.value,
+    $checked: e.target?.checked,
+  };
+}
+
 export default surge;
