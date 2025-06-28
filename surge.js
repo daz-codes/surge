@@ -1,8 +1,10 @@
 function surge(actions = {}, templates = {}) {
+  const surgeContainer = document.querySelector("[data-surge]");
+  if (!surgeContainer) return;
   const DATA_LIST = "[data-reaction],[data-bind],[data-template]";
   const elements = new Map();
   const bindings = {};
-  const state = {};
+  const state = parseInput(surgeContainer.dataset.surge);
   const calcs = initializeCalcs();
   const localStorageKey =
     document.querySelector("[data-surge]")?.dataset.localStorage || null;
@@ -47,16 +49,18 @@ function surge(actions = {}, templates = {}) {
     },
   });
 
-  const surgeContainer = document.querySelector("[data-surge]");
-  if (!surgeContainer) return;
-
   surgeContainer.querySelectorAll(DATA_LIST).forEach(processElement);
   bindAllActions(surgeContainer);
 
   function initializeTemplate(el) {
     const template = templates[el.dataset.template];
     const target = document.querySelector(el.dataset.target) || el;
-    if (template) target.innerHTML = template(undefined, $);
+    if (template) {
+      const value = state[el.dataset.template];
+      if (Array.isArray(value)) {
+        target.innerHTML = value.map((v) => template(v, $)).join("");
+      } else target.innerHTML = template(value, $);
+    }
     el.querySelectorAll(DATA_LIST).forEach(processElement);
   }
 
@@ -73,14 +77,18 @@ function surge(actions = {}, templates = {}) {
       const stored = localStorage.getItem(`${localStorageKey}-${key}`);
       if (stored) state[key] = parseInput(stored);
     } else {
-      state[key] = parseInput(el.textContent);
+      state[key] ||= parseInput(el.textContent);
     }
 
     bindings[key] ||= [];
     bindings[key].push(el);
 
     const template = templates[key] || templates[el.dataset.template];
-    el.innerHTML = template ? template(state[key], $) : state[key];
+    el.innerHTML = template
+      ? Array.isArray(state[key])
+        ? state[key].map((value) => template(value, $)).join("")
+        : template(state[key], $)
+      : state[key];
   }
 
   function registerElement(el) {
@@ -281,9 +289,10 @@ function parseAction(action) {
 
 function parseInput(value) {
   try {
-    return JSON.parse(value);
-  } catch {
-    return value;
+    return new Function(`return (${value})`)();
+  } catch (e) {
+    console.error("Failed to parse value:", value);
+    return {};
   }
 }
 
