@@ -1,7 +1,8 @@
 function surge(actions = {}, templates = {}) {
   const surgeContainer = document.querySelector("[data-surge]");
   if (!surgeContainer) return;
-  const DATA_LIST = "[data-reaction],[data-bind],[data-template]";
+  const DATA_LIST =
+    "[data-reaction],[data-bind],[data-template],[data-hidden],[data-visible]";
   const elements = new Map();
   const bindings = {};
   const state = parseInput(surgeContainer.dataset.surge);
@@ -29,19 +30,36 @@ function surge(actions = {}, templates = {}) {
     },
     set(target, prop, value) {
       state[prop] = value;
+
       if (bindings[prop]) {
         bindings[prop].forEach((el) => {
-          const template = templates[prop] || templates[el.dataset.template];
-          el.innerHTML = template ? template(value, $) : value;
+          // Handle data-reaction
+          if (el.dataset.reaction === prop || el.dataset.template === prop) {
+            const template = templates[prop] || templates[el.dataset.template];
+            el.innerHTML = template ? template(value, $) : value;
+          }
+
+          // Handle data-hidden
+          if (el.dataset.hidden === prop) {
+            el.hidden = !!value;
+          }
+
+          // Handle data-visible
+          if (el.dataset.visible === prop) {
+            el.hidden = !value;
+          }
+
           updateCalculations(prop);
         });
       }
+
       if (localStorageKey) {
         localStorage.setItem(
           `${localStorageKey}-${prop}`,
           JSON.stringify(value),
         );
       }
+
       return true;
     },
     apply(target, thisArg, args) {
@@ -67,7 +85,24 @@ function surge(actions = {}, templates = {}) {
   function processElement(el) {
     if (el.dataset.template) initializeTemplate(el);
     if (el.dataset.reaction) initializeBinding(el);
+    console.log(bindings);
     if (el.dataset.bind) bindTwoWay(el);
+    if (el.dataset.hidden) bindHidden(el);
+    if (el.dataset.visible) bindVisible(el);
+  }
+
+  function bindHidden(el) {
+    const prop = el.dataset.hidden;
+    bindings[prop] ||= [];
+    bindings[prop].push(el);
+    el.hidden = !!state[prop]; // true means hidden
+  }
+
+  function bindVisible(el) {
+    const prop = el.dataset.visible;
+    bindings[prop] ||= [];
+    bindings[prop].push(el);
+    el.hidden = !state[prop]; // visible = true → show
   }
 
   function initializeBinding(el) {
