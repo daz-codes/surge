@@ -150,8 +150,8 @@ Have a look at the examples below to see how Surge can be used to create a varie
 ```html
 <main data-surge>
   <h1>❤️ <strong data-reaction="count">0</strong></h1>
-  <button data-action="$.count.value++">👍</button>
-  <button data-action="$.count.value--">👎</button>
+  <button data-action="$.count++">👍</button>
+  <button data-action="$.count--">👎</button>
 </main>
 ```
 
