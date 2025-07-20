@@ -15,9 +15,7 @@ Look how simple a basic counter is - just add a data-action and data-reaction fo
 
 The `$` is the Surge object, it's like a next-gen jQuery that can also manage reactive state!
 
-No virtual DOM. No build step. No dependencies. Just drop it in and go.
-
-Surge embraces the simplicity of the web and the power of HTML-first development. It supercharges your HTML with a sprinkle of declarative magic using `data-*` attributes — no JSX, no diffing and no dependencies. Just clean, semantic HTML — with a surge of reactivity!
+Surge embraces the simplicity of the web and the power of HTML-first development. It supercharges your HTML with a sprinkle of declarative magic using `data-*` attributes — no JSX, no build step and no dependencies. Just clean, semantic HTML — with a surge of reactivity!
 
 ## Another Example
 
