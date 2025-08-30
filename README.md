@@ -8,12 +8,10 @@ Look how simple a basic counter is - just add a data-action and data-reaction fo
 
 ```html
 <main data-surge>
-  <button data-action="$.count++">Count</button>
+  <button data-action="count++">Count</button>
   <h1 data-reaction="count">0</h1>
 </main>
 ```
-
-The `$` is the Surge object, it's like a next-gen jQuery that can also manage reactive state!
 
 Surge embraces the simplicity of the web and the power of HTML-first development. It supercharges your HTML with a sprinkle of declarative magic using `data-*` attributes — no JSX, no build step and no dependencies. Just clean, semantic HTML — with a surge of reactivity!
 
@@ -32,10 +30,13 @@ Write some HTML ...
 ... then register the named action in the JS:
 
 ```javascript
-surge({
+surge(actions: {
     greet: $ => $.output = $("#name").value
 })
 ```
+
+The `$` is the Surge object, it's like a next-gen jQuery that can also manage reactive state!
+
 
 ![Hello Surge!](https://github.com/daz4126/surge/assets/16646/96c7fadf-6b1f-43e2-a80f-980d953e9933)
 
@@ -148,8 +149,8 @@ Have a look at the examples below to see how Surge can be used to create a varie
 ```html
 <main data-surge>
   <h1>❤️ <strong data-reaction="count">0</strong></h1>
-  <button data-action="$.count++">👍</button>
-  <button data-action="$.count--">👎</button>
+  <button data-action="count++">👍</button>
+  <button data-action="count--">👎</button>
 </main>
 ```
 
@@ -162,7 +163,7 @@ Have a look at the examples below to see how Surge can be used to create a varie
 #### HTML:
 ```html
 <main data-surge>
-  <textarea data-action="$.count = $el.value.length"></textarea>
+  <textarea data-action="count = $el.value.length"></textarea>
   <p>
     There are
     <strong data-reaction="count">0</strong> characters in this textarea.
@@ -178,7 +179,7 @@ Have a look at the examples below to see how Surge can be used to create a varie
 
 #### HTML:
 ```html
-<main data-surge data-calculate="update">
+<main data-surge data-calculate="bmi = (weight / (height/100)**2).toFixed(1)">
   <h2>BMI Calculator</h2>
   <h2>BMI: <strong data-reaction="bmi">22.2</strong></h2>
   <label>Weight (kg):</label>
@@ -190,13 +191,6 @@ Have a look at the examples below to see how Surge can be used to create a varie
 </main>
 ```
 
-#### JavaScript:
-```javascript
-surge({
-  update: $ => $.bmi = ($.weight / ($.height/100)**2).toFixed(1)
-})
-```
-
 [See the code on CodePen](https://codepen.io/daz4126/pen/abxXwQR)
 
 ### Slideshow
@@ -206,33 +200,16 @@ surge({
 
 #### HTML:
 ```html
-<main data-surge>
-  <button data-action="previous"> ← </button>
-  <button data-action="next"> → </button>
+<main data-surge="{slide: 0}">
+  <button data-action="slide = (slide+3)%4"> ← </button>
+  <button data-action="slide = (slide+1)%4"> → </button>
   <div>
-    <div class="slide">🐵</div>
-    <div class="slide" hidden>🙈</div>
-    <div class="slide" hidden>🙉</div>
-    <div class="slide" hidden>🙊</div>
+    <div data-visible="slide==0">🐵</div>
+    <div data-visible="slide==1">🙈</div>
+    <div data-visible="slide==2">🙉</div>
+    <div data-visible="slide==3">🙊</div>
   </div>
 </main>
-```
-
-#### JavaScript:
-```javascript
-const showCurrentSlide = (slides,i) =>  slides.forEach((element, j) => element.hidden = j !== i)
-
-surge({
-  init: $ => $.index = 0,
-  next: $ => {
-    $.index = ($.index+1)%4
-    showCurrentSlide($(".slide"),$.index)
-  },
-  previous: $ => {
-    $.index = (($.index-1)%4+4)%4
-    showCurrentSlide($(".slide"),$.index)
-  }
-})
 ```
 
 [See the code on CodePen](https://codepen.io/daz4126/pen/poBYMoP)
@@ -243,30 +220,12 @@ surge({
 
 #### HTML:
 ```html
-<main data-surge>
-  <h1 data-reaction="time">0.00</h1>
-  <button data-reaction="start_stop" data-action="toggle">Start</button>
-  <button data-action="reset">Reset</button>
+<main data-surge="{ticking: false}">
+  <h1 data-reaction="time">0</h1>
+  <button data-hidden="ticking" data-action="ticking = setInterval(() => time += .01,10)">Start</button>
+  <button data-visible="ticking" data-action="ticking = clearInterval(ticking)">Stop</button>
+  <button data-action="time = 0">Reset</button>
 </main>
-```
-
-#### JavaScript:
-```javascript
-surge({
-  toggle: $ => {
-    $.start_stop = $.ticking ? "Start" : "Stop"
-    if($.ticking){
-      $.ticking = clearInterval($.ticking)
-    } else {
-        $.ticking = setInterval(() => {
-          $.time = (Number($.time) + 0.01).toFixed(2)
-    },10)
-    }
-  },
-  reset: $ => {
-    $.time = (0).toFixed(2)
-  }
-})
 ```
 
 [See the code on CodePen](https://codepen.io/daz4126/pen/mdgoqOQ)
