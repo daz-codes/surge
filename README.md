@@ -117,11 +117,17 @@ surge(actions)
 
 For simple, one-line actions, you can just write them inline like this:
 
-```javascript
+```html
 <button data-action="$.count++">Count</button>
 ```
 
-This means that you don't need to write any JavaScript at all, just call the surge function:
+Inline actions are name-spaced to the Surge object, so you don't need to refrence it and can just refer to reactive properties as if they are global variables:
+
+```html
+<button data-action="count++">Count</button>
+```
+
+This means that you can achieve some powerful results without even writing any JavaScript at all! Just call the surge function:
 
 ```javascript
 surge()
